@@ -1,0 +1,4 @@
+playwright
+pyautogui
+fastapi
+uvicorn[standard]

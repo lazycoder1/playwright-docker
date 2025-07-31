@@ -1,0 +1,40 @@
+# Use a base image with Python and Node.js
+FROM nikolaik/python-nodejs:python3.11-nodejs20-bullseye
+
+# Set the working directory to the root.
+# This allows us to treat the "app" directory as a package.
+WORKDIR /
+
+# Copy application code into the /app directory
+COPY ./app /app
+COPY ./requirements.txt /app/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Install Playwright and its browser dependencies
+# This step can take a while
+RUN npx playwright install --with-deps
+
+# Install necessary OS packages for UI
+RUN apt-get update && apt-get install -y \
+    xvfb \
+    fluxbox \
+    x11vnc \
+    novnc \
+    chromium \
+    net-tools \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Expose ports for the web app, VNC, and noVNC
+EXPOSE 3000
+EXPOSE 5900
+EXPOSE 7900
+
+# Copy the entrypoint script to the root and make it executable
+COPY entrypoint.sh /
+RUN chmod +x /entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/entrypoint.sh"]

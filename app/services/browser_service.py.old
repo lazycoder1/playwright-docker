@@ -1,0 +1,77 @@
+from playwright.async_api import async_playwright, Browser, Page
+from fastapi.responses import Response
+from app.models import Element, InteractiveElementsResponse
+
+class BrowserService:
+    """
+    Manages all browser-related interactions using Playwright.
+    This service acts as the 'eyes' of the agent, inspecting the DOM and
+    providing context about the web page.
+    """
+    def __init__(self):
+        self.browser: Browser = None
+        self.page: Page = None
+
+    async def launch_browser(self):
+        """
+        Connects to the remotely running Chrome instance and injects necessary scripts.
+        This is a crucial step in the hybrid architecture, allowing Playwright
+        to control a browser that is visible and controllable by PyAutoGUI.
+        """
+        playwright = await async_playwright().start()
+        self.browser = await playwright.chromium.connect_over_cdp("http://localhost:9222")
+        # Get the first context, which is the default one
+        context = self.browser.contexts[0]
+        # Inject the script into the context
+        with open("app/static/get_path.js", "r") as f:
+            js_script = f.read()
+            await context.add_init_script(js_script)
+        self.page = context.pages[0]
+
+    async def close_browser(self):
+        """Closes the browser connection."""
+        if self.browser:
+            await self.browser.close()
+
+    async def get_interactive_elements(self) -> InteractiveElementsResponse:
+        """
+        Finds all interactive elements on the page and returns them.
+        This is a placeholder implementation.
+        """
+        print("🤖 Finding interactive elements...")
+        # In a real implementation, you would use page.evaluate to run JS to find all
+        # buttons, links, inputs, etc., and return them in a structured way.
+        return InteractiveElementsResponse(elements=[])
+
+    async def get_element_center_coordinates(self, selector: str) -> dict:
+        """
+        Finds an element by its selector and returns its center coordinates.
+        Raises an exception if the element is not found or not visible.
+        """
+        element = self.page.locator(selector).first
+        try:
+            bounding_box = await element.bounding_box(timeout=5000)
+            if not bounding_box:
+                raise ValueError("Element is not visible or has no size.")
+        except Exception:
+            raise ValueError(f"Element not found for selector: {selector}")
+
+        center_x = bounding_box['x'] + (bounding_box['width'] / 2)
+        center_y = bounding_box['y'] + (bounding_box['height'] / 2)
+
+        return {"x": center_x, "y": center_y}
+
+    async def navigate(self, url: str):
+        """Navigates the page to a new URL."""
+        await self.page.goto(url, wait_until="domcontentloaded")
+
+    async def get_current_url(self) -> str:
+        """Returns the current URL of the page."""
+        return self.page.url
+
+    async def get_screenshot(self) -> Response:
+        """Takes a screenshot of the current page and returns it as a PNG response."""
+        screenshot_bytes = await self.page.screenshot()
+        return Response(content=screenshot_bytes, media_type="image/png")
+
+browser_service = BrowserService()
