@@ -1,0 +1,4 @@
+#!/bin/bash
+export DISPLAY=:99
+# Let the system find chromium automatically
+exec chromium --no-sandbox --disable-dev-shm-usage --user-data-dir=/shared-browser-data "$@"

@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+    playwright-mcp:
+        container_name: hubspot-playwright-vnc
+        build:
+            context: .
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        ports:
+            - "${PLAYWRIGHT_MCP_PORT:-8831}:8831" # MCP server
+            - "5900:5900" # VNC port for direct VNC client access
+            - "${NOVNC_PORT:-7900}:7900" # noVNC web interface
+        environment:
+            # Core configuration (user-defined in .env)
+            - PLAYWRIGHT_MCP_PORT=${PLAYWRIGHT_MCP_PORT:-8831}
+            - PLAYWRIGHT_VIEWPORT_SIZE=${PLAYWRIGHT_VIEWPORT_SIZE:-1280,720}
+            # Display configuration
+            - DISPLAY=:99
+            # Debug mode (optional)
+            - DEBUG=${DEBUG:-}
+        volumes:
+            - shared-screenshots:/screenshots
+            - playwright-browser-data:/app/browser-data
+            - shared-browser-data:/shared-browser-data
+        networks:
+            - app-network
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8831/health || exit 0"]
+            interval: 30s
+            timeout: 10s
+            start_period: 60s
+            retries: 3
+        # Essential for browser in container
+        shm_size: "1g"
+        security_opt:
+            - seccomp:unconfined
+        cap_add:
+            - SYS_ADMIN
+        # Ensure proper cleanup on stop
+        stop_grace_period: 30s
+
+volumes:
+    shared-screenshots:
+        driver: local
+    playwright-browser-data:
+        driver: local
+    shared-browser-data:
+        driver: local
+
+networks:
+    app-network:
+        driver: bridge
